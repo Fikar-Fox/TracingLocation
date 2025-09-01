@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pembuat Link Pelacak - Lacak Lokasi Pengunjung</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        #tracking-map {
+            height: 400px;
+            width: 100%;
+            border-radius: 12px;
+        }
+        .page {
+            display: none;
+        }
+        .page.active {
+            display: block;
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .link-card {
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+        .link-card:hover {
+            transform: translateY(-2px);
+            border-color: #3b82f6;
+            box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.1);
+        }
+        .copy-btn {
+            transition: all 0.2s ease;
+        }
+        .copy-btn:hover {
+            background-color: #3b82f6 !important;
+            color: white !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center">
+                    <div class="bg-white/20 p-2 rounded-full mr-3">
+                        <img src="https://placehold.co/40x40" alt="Ikon radar pelacakan lokasi dengan pulsa biru dan titik pusat" class="w-6 h-6" onerror="this.style.display='none'"/>
+                    </div>
+                    <h1 class="text-xl font-bold">Link Pelacak Lokasi</h1>
+                </div>
+                <div class="flex space-x-4">
+                    <button onclick="showPage('create-link')" class="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition">
+                        <i class="fas fa-plus mr-2"></i>Buat Link
+                    </button>
+                    <button onclick="showPage('dashboard')" class="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition">
+                        <i class="fas fa-chart-bar mr-2"></i>Dashboard
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Create Link Page -->
+    <div id="create-link" class="page active">
+        <div class="container mx-auto px-4 py-8">
+            <div class="max-w-2xl mx-auto">
+                <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">
+                        <i class="fas fa-link text-blue-600 mr-2"></i>Buat Link Pelacak Baru
+                    </h2>
+                    
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Nama Kustom Link</label>
+                        <input type="text" id="link-name" placeholder="Contoh: Promosi Summer Sale" 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">URL Tujuan (Opsional)</label>
+                        <input type="url" id="destination-url" placeholder="https://website-anda.com" 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <p class="text-sm text-gray-500 mt-1">Kosongkan jika hanya ingin melacak lokasi tanpa redirect</p>
+                    </div>
+
+                    <button onclick="generateTrackingLink()" class="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition font-semibold">
+                        <i class="fas fa-magic mr-2"></i>Buat Link Pelacak
+                    </button>
+                </div>
+
+                <!-- Generated Link Section -->
+                <div id="generated-link-section" class="bg-green-50 border border-green-200 rounded-xl p-6 hidden">
+                    <h3 class="text-lg font-semibold text-green-800 mb-4">
+                        <i class="fas fa-check-circle mr-2"></i>Link Berhasil Dibuat!
+                    </h3>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-green-700 mb-2">Link Pelacak Anda:</label>
+                        <div class="flex">
+                            <input type="text" id="generated-link" readonly 
+                                   class="flex-1 px-4 py-2 border border-green-300 rounded-l-lg bg-white">
+                            <button onclick="copyToClipboard()" class="bg-green-600 text-white px-4 py-2 rounded-r-lg copy-btn">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border">
+                        <h4 class="font-semibold text-gray-700 mb-2">Cara Penggunaan:</h4>
+                        <ul class="text-sm text-gray-600 space-y-1">
+                            <li><i class="fas fa-share-alt text-green-600 mr-2"></i>Bagikan link ini di media sosial, email, atau WhatsApp</li>
+                            <li><i class="fas fa-map-marker-alt text-blue-600 mr-2"></i>Lokasi pengunjung akan terekam otomatis</li>
+                            <li><i class="fas fa-chart-line text-purple-600 mr-2"></i>Lihat hasilnya di dashboard tracking</li>
+                        </ul>
+                    </div>
+
+                    <div class="mt-4 flex space-x-3">
+                        <button onclick="shareOnWhatsApp()" class="flex-1 bg-green-500 text-white py-2 px-4 rounded-lg hover:bg-green-600 transition">
+                            <i class="fab fa-whatsapp mr-2"></i>Share WhatsApp
+                        </button>
+                        <button onclick="testTrackingLink()" class="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition">
+                            <i class="fas fa-test mr-2"></i>Test Link
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard Page -->
+    <div id="dashboard" class="page">
+        <div class="container mx-auto px-4 py-8">
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                    <i class="fas fa-chart-bar text-blue-600 mr-2"></i>Dashboard Pelacakan
+                </h2>
+
+                <!-- Stats Overview -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-blue-50 p-4 rounded-lg text-center">
+                        <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                            <i class="fas fa-link text-blue-600"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-blue-800" id="total-links">0</h3>
+                        <p class="text-blue-600">Total Link</p>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-lg text-center">
+                        <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                            <i class="fas fa-eye text-green-600"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-green-800" id="total-clicks">0</h3>
+                        <p class="text-green-600">Total Klik</p>
+                    </div>
+                    <div class="bg-purple-50 p-4 rounded-lg text-center">
+                        <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                            <i class="fas fa-map-marker-alt text-purple-600"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-purple-800" id="unique-locations">0</h3>
+                        <p class="text-purple-600">Lokasi Unik</p>
+                    </div>
+                    <div class="bg-orange-50 p-4 rounded-lg text-center">
+                        <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                            <i class="fas fa-users text-orange-600"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold text-orange-800" id="active-now">0</h3>
+                        <p class="text-orange-600">Aktif Sekarang</p>
+                    </div>
+                </div>
+
+                <!-- Tracking Links List -->
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Link Anda</h3>
+                <div id="links-list" class="space-y-4 mb-8">
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-link text-4xl mb-3 opacity-50"></i>
+                        <p>Belum ada link yang dibuat. Buat link pertama Anda!</p>
+                    </div>
+                </div>
+
+                <!-- Map Visualization -->
+                <h3 class="text-xl font-semibold text-gray-800 mb-4">Peta Lokasi Pengunjung</h3>
+                <div id="tracking-map" class="border border-gray-200"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tracking Page (This is what people see when they click tracking links) -->
+    <div id="tracking-page" class="page">
+        <div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
+            <div class="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
+                <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-map-marker-alt text-blue-600 text-2xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-800 mb-2">Sedang Melacak Lokasi</h1>
+                <p class="text-gray-600 mb-6">Harap tunggu sebentar...</p>
+                <div class="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-6"></div>
+                <p class="text-sm text-gray-500">Lokasi Anda sedang direkam untuk keperluan analitik</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Data storage
+        let trackingLinks = JSON.parse(localStorage.getItem('trackingLinks')) || [];
+        let map;
+
+        // Page navigation
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            document.getElementById(pageId).classList.add('active');
+            
+            if (pageId === 'dashboard') {
+                loadDashboard();
+            }
+        }
+
+        // Generate tracking link
+        function generateTrackingLink() {
+            const linkName = document.getElementById('link-name').value.trim();
+            const destinationUrl = document.getElementById('destination-url').value.trim();
+            
+            if (!linkName) {
+                alert('Silakan beri nama untuk link Anda!');
+                return;
+            }
+
+            const trackingId = 'track_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            const trackingUrl = window.location.origin + window.location.pathname + '?track=' + trackingId;
+            
+            const newLink = {
+                id: trackingId,
+                name: linkName,
+                trackingUrl: trackingUrl,
+                destinationUrl: destinationUrl,
+                createdAt: new Date().toISOString(),
+                clicks: []
+            };
+
+            trackingLinks.push(newLink);
+            localStorage.setItem('trackingLinks', JSON.stringify(trackingLinks));
+
+            // Show generated link
+            document.getElementById('generated-link').value = trackingUrl;
+            document.getElementById('generated-link-section').classList.remove('hidden');
+            
+            // Scroll to generated link section
+            document.getElementById('generated-link-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Copy to clipboard
+        function copyToClipboard() {
+            const linkInput = document.getElementById('generated-link');
+            linkInput.select();
+            document.execCommand('copy');
+            
+            // Show feedback
+            const copyBtn = document.querySelector('.copy-btn');
+            const originalHtml = copyBtn.innerHTML;
+            copyBtn.innerHTML = '<i class="fas fa-check"></i>';
+            copyBtn.classList.add('bg-green-700');
+            
+            setTimeout(() => {
+                copyBtn.innerHTML = originalHtml;
+                copyBtn.classList.remove('bg-green-700');
+            }, 2000);
+        }
+
+        // Share on WhatsApp
+        function shareOnWhatsApp() {
+            const link = document.getElementById('generated-link').value;
+            const text = 'Check out this link: ' + link;
+            window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+        }
+
+        // Test tracking link
+        function testTrackingLink() {
+            const link = document.getElementById('generated-link').value;
+            window.open(link, '_blank');
+        }
+
+        // Load dashboard data
+        function loadDashboard() {
+            // Update stats
+            document.getElementById('total-links').textContent = trackingLinks.length;
+            
+            const totalClicks = trackingLinks.reduce((sum, link) => sum + link.clicks.length, 0);
+            document.getElementById('total-clicks').textContent = totalClicks;
+            
+            // For demo purposes, show some numbers
+            document.getElementById('unique-locations').textContent = Math.min(25, totalClicks);
+            document.getElementById('active-now').textContent = Math.min(3, Math.floor(totalClicks / 10));
+
+            // Load links list
+            const linksList = document.getElementById('links-list');
+            linksList.innerHTML = '';
+
+            if (trackingLinks.length === 0) {
+                linksList.innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-link text-4xl mb-3 opacity-50"></i>
+                        <p>Belum ada link yang dibuat. Buat link pertama Anda!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            trackingLinks.forEach(link => {
+                const linkElement = document.createElement('div');
+                linkElement.className = 'link-card bg-gray-50 p-4 rounded-lg';
+                linkElement.innerHTML = `
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <h4 class="font-semibold text-gray-800">${link.name}</h4>
+                            <p class="text-sm text-gray-600">Dibuat: ${new Date(link.createdAt).toLocaleDateString('id-ID')}</p>
+                        </div>
+                        <span class="bg-blue-100 text-blue-800 text-sm px-2 py-1 rounded">
+                            ${link.clicks.length} klik
+                        </span>
+                    </div>
+                    <div class="bg-white p-3 rounded border mb-3">
+                        <p class="text-xs text-gray-500 mb-1">Link Pelacak:</p>
+                        <p class="text-sm font-mono text-gray-800 truncate">${link.trackingUrl}</p>
+                    </div>
+                    ${link.destinationUrl ? `
+                    <div class="bg-white p-3 rounded border mb-3">
+                        <p class="text-xs text-gray-500 mb-1">Redirect ke:</p>
+                        <p class="text-sm font-mono text-blue-600 truncate">${link.destinationUrl}</p>
+                    </div>
+                    ` : ''}
+                    <div class="flex space-x-2">
+                        <button onclick="viewLinkDetails('${link.id}')" class="text-blue-600 hover:text-blue-800 text-sm">
+                            <i class="fas fa-analytics mr-1"></i>Detail
+                        </button>
+                        <button onclick="copyLink('${link.trackingUrl}')" class="text-green-600 hover:text-green-800 text-sm">
+                            <i class="fas fa-copy mr-1"></i>Salin
+                        </button>
+                    </div>
+                `;
+                linksList.appendChild(linkElement);
+            });
+
+            // Initialize map if not already
+            initMap();
+        }
+
+        // Initialize map
+        function initMap() {
+            if (!map) {
+                map = L.map('tracking-map').setView([-2.5489, 118.0149], 4); // Center on Indonesia
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+            } else {
+                map.eachLayer(layer => {
+                    if (layer instanceof L.Marker) {
+                        map.removeLayer(layer);
+                    }
+                });
+            }
+
+            // Add markers for all clicks
+            trackingLinks.forEach(link => {
+                link.clicks.forEach(click => {
+                    if (click.latitude && click.longitude) {
+                        const marker = L.marker([click.latitude, click.longitude]).addTo(map);
+                        marker.bindPopup(`
+                            <div class="p-2">
+                                <strong>${link.name}</strong><br>
+                                Waktu: ${new Date(click.timestamp).toLocaleString('id-ID')}<br>
+                                Lokasi: ${click.latitude.toFixed(4)}, ${click.longitude.toFixed(4)}
+                            </div>
+                        `);
+                    }
+                });
+            });
+        }
+
+        // Handle tracking when someone opens a tracking link
+        function handleTracking() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const trackId = urlParams.get('track');
+            
+            if (trackId) {
+                showPage('tracking-page');
+                
+                // Simulate location tracking (in real implementation, you'd use navigator.geolocation)
+                setTimeout(() => {
+                    // Find the tracking link
+                    const linkIndex = trackingLinks.findIndex(link => link.id === trackId);
+                    if (linkIndex !== -1) {
+                        // Simulate random location in Indonesia for demo
+                        const randomLat = -6.2 + (Math.random() * 10 - 5);
+                        const randomLng = 106.8 + (Math.random() * 10 - 5);
+                        
+                        const clickData = {
+                            timestamp: new Date().toISOString(),
+                            latitude: randomLat,
+                            longitude: randomLng,
+                            userAgent: navigator.userAgent
+                        };
+                        
+                        trackingLinks[linkIndex].clicks.push(clickData);
+                        localStorage.setItem('trackingLinks', JSON.stringify(trackingLinks));
+                        
+                        // Redirect if destination URL is set
+                        if (trackingLinks[linkIndex].destinationUrl) {
+                            window.location.href = trackingLinks[linkIndex].destinationUrl;
+                        } else {
+                            // Show success message
+                            document.querySelector('#tracking-page .text-gray-600').textContent = 'Lokasi berhasil direkam!';
+                            document.querySelector('#tracking-page .text-sm').textContent = 'Terima kasih telah berkunjung.';
+                        }
+                    }
+                }, 2000);
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            handleTracking();
+            loadDashboard();
+        });
+
+        // Helper functions
+        function copyLink(url) {
+            navigator.clipboard.writeText(url).then(() => {
+                alert('Link berhasil disalin!');
+            });
+        }
+
+        function viewLinkDetails(linkId) {
+            alert('Fitur detail akan segera hadir!');
+            // In a real implementation, you'd show detailed analytics for this link
+        }
+    </script>
+</body>
+</html>
